@@ -1,8 +1,14 @@
 # ====================================================
-# YEStudio 硬件配置一键获取 Agent (稳健跳转版)
+# YEStudio Hardware Specs Agent (New Directory: getsysinfo)
 # ====================================================
 
-# 1. 网络与 TLS 协议兼容设置
+# ----------------------------------------------------
+# Server Configuration
+# ----------------------------------------------------
+$baseUrl   = "https://yestudio.co.nz/getsysinfo"
+$targetUrl = "$baseUrl/upload.php"
+
+# 1. Network & TLS Security Protocols Setup
 try {
     [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
@@ -10,19 +16,19 @@ try {
 
 Write-Host "Collecting hardware information..." -ForegroundColor Green
 
-# 2. 提取操作系统
+# 2. Extract Operating System
 $os = "Windows"
 try {
     $os = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).Caption.Trim()
 } catch {}
 
-# 3. 提取 CPU
+# 3. Extract CPU
 $cpu = "Unknown CPU"
 try {
     $cpu = (Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1).Name.Trim()
 } catch {}
 
-# 4. 提取内存 (RAM)
+# 4. Extract Memory (RAM)
 $ramStr = "Unknown RAM"
 try {
     $mems = Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue
@@ -34,7 +40,7 @@ try {
     }
 } catch {}
 
-# 5. 提取硬盘 (优化 NVMe/SSD 识别)
+# 5. Extract Storage Disks (NVMe/SSD Recognition)
 $disks = @()
 try {
     $diskObjs = Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue
@@ -47,6 +53,8 @@ try {
                  ($md -like "*Solid State*") -or 
                  ($md -like "*SN530*") -or 
                  ($md -like "*SN750*") -or 
+                 ($md -like "*SN850*") -or 
+                 ($md -like "*SN350*") -or 
                  ($md -like "*WDC PC*")
                  
         $type = if ($isSSD) { "SSD" } else { "HDD" }
@@ -55,14 +63,14 @@ try {
 } catch {}
 if ($disks.Count -eq 0) { $disks += "Unknown Disk" }
 
-# 6. 提取主板
+# 6. Extract Motherboard
 $board = "Unknown Motherboard"
 try {
     $b = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue | Select-Object -First 1
     $board = "$($b.Manufacturer) $($b.Product)".Trim()
 } catch {}
 
-# 7. 提取显卡 (过滤 DisplayLink / Remote Display 等虚拟设备)
+# 7. Extract Graphics (GPU) - Filter Virtual Display Devices
 $gpus = @()
 try {
     $gList = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
@@ -83,19 +91,17 @@ try {
 } catch {}
 if ($gpus.Count -eq 0) { $gpus += "Integrated Graphics" }
 
-# 8. 打包 JSON
+# 8. Package Data to JSON
 $specData = @{
-    OS = $os
-    CPU = $cpu
-    RAM = $ramStr
-    Disks = $disks
+    OS          = $os
+    CPU         = $cpu
+    RAM         = $ramStr
+    Disks       = $disks
     Motherboard = $board
-    GPUs = $gpus
+    GPUs        = $gpus
 } | ConvertTo-Json -Compress
 
-# 9. 回传服务端并调起网页
-$targetUrl = "https://yestudio.co.nz/get_sys_info/upload.php"
-
+# 9. POST Data to Server and Launch Report Page
 Write-Host "Uploading data to server..." -ForegroundColor Green
 
 try {
@@ -110,17 +116,16 @@ try {
         $finalUrl = $res.url
         Write-Host "Opening report page: $finalUrl" -ForegroundColor Cyan
         
-        # 第一重唤起机制：Start-Process
+        # Dual-browser launch strategy
         try {
             Start-Process $finalUrl
         } catch {
-            # 第二重降级机制：调用 system explorer 打开 URL
             & explorer.exe $finalUrl
         }
     } else {
-        & explorer.exe "https://yestudio.co.nz/get_sys_info/"
+        & explorer.exe "$baseUrl/"
     }
 } catch {
     Write-Host "Upload error, opening main page..." -ForegroundColor Red
-    & explorer.exe "https://yestudio.co.nz/get_sys_info/"
+    & explorer.exe "$baseUrl/"
 }

